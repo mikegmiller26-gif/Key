@@ -1,73 +1,18 @@
-name: PC Gamer Virtual Moonlight
-
-on: 
-  workflow_dispatch:
-
-jobs:
-  deploy_vm:
-    runs-on: windows-latest
-    
-    steps:
-    - name: Configurar e Instalar Servidor Sunshine
-      run: |
-        echo "Instalando Sunshine mediante Chocolatey..."
-        choco install sunshine -y --bypass-vcs
-        
-    - name: Instalar Monitor Virtual Estable
-      run: |
-        echo "Configurando pantalla virtual directa..."
-        New-Item -ItemType Directory -Force -Path "C:\VirtualDisplay" | Out-Null
-        
-        $url = "https://github.com"
-        $zip = "C:\VirtualDisplay\driver.zip"
-        
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $url -OutFile $zip
-        
-        $shell = New-Object -ComObject Shell.Application
-        $zipFolder = $shell.NameSpace($zip)
-        $destFolder = $shell.NameSpace("C:\VirtualDisplay")
-        $destFolder.CopyHere($zipFolder.Items(), 0x10)
-        echo "Monitor virtual listo."
-
-    - name: Configurar Conexión Segura con Ngrok por Archivo
+    - name: Configurar Conexión Segura con Ngrok
       env:
         NGROK_AUTH_TOKEN: "2ZunC6v3YgGf687Xm9wLQ_2kR1p7v5B4N3M2kL9jH8g"
       run: |
         echo "Instalando Ngrok..."
         choco install ngrok -y
         
-        echo "Generando archivo de configuracion estricto ngrok.yml..."
-        # Creamos el directorio por defecto si no existe
-        New-Item -ItemType Directory -Force -Path "$env:LocalAppData\ngrok" | Out-Null
+        # Autenticar token
+        ngrok config add-authtoken "$env:NGROK_AUTH_TOKEN"
         
-        # Escribimos el archivo de configuración forzando la creación de los Endpoints
-        $configContent = @"
-        version: "3"
-        agent:
-          authtoken: "$env:NGROK_AUTH_TOKEN"
-        endpoints:
-          - name: sunshine-web
-            proto: http
-            upstream:
-              url: https://localhost:47990
-          - name: moonlight-stream
-            proto: tcp
-            upstream:
-              url: tcp://localhost:47989
-        "@
-        Set-Content -Path "$env:LocalAppData\ngrok\ngrok.yml" -Value $configContent
+        echo "Forzando inicio de Sunshine en segundo plano..."
+        # Arrancamos el ejecutable de Sunshine directamente para asegurar que escuche el puerto
+        Start-Process -FilePath "C:\Program Files\Sunshine\bin\sunshine.exe" -WindowStyle Hidden
+        Start-Sleep -Seconds 10
         
-        echo "=== INICIANDO TÚNELES INTEGRADOS ==="
-        # Arranca ngrok leyendo explícitamente el archivo generado
-        Start-Process ngrok -ArgumentList "start --all --config=$env:LocalAppData\ngrok\ngrok.yml"
-        
-        # Bucle de mantenimiento de 6 horas
-        $timeout = 360 * 60
-        $elapsed = 0
-        while ($elapsed -lt $timeout) {
-            Start-Sleep -Seconds 60
-            $elapsed += 60
-            echo "Máquina virtual en línea... Tiempo corriendo: ($elapsed / $timeout) segundos"
-        }
-
+        echo "=== INICIANDO TÚNEL TCP EN PUERTO 47990 ==="
+        # Ejecutamos Ngrok mostrando la salida en la consola de GitHub para ver la IP directamente
+        ngrok tcp 47990 --log=stdout
