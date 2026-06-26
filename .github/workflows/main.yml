@@ -1,4 +1,3 @@
-
 name: PC Gamer Virtual Moonlight
 
 on: 
@@ -31,21 +30,39 @@ jobs:
         $destFolder.CopyHere($zipFolder.Items(), 0x10)
         echo "Monitor virtual listo."
 
-    - name: Configurar Conexión Segura con Ngrok
+    - name: Configurar Conexión Segura con Ngrok por Archivo
       env:
         NGROK_AUTH_TOKEN: "2ZunC6v3YgGf687Xm9wLQ_2kR1p7v5B4N3M2kL9jH8g"
       run: |
         echo "Instalando Ngrok..."
         choco install ngrok -y
         
-        # Autenticar usando tu token integrado
-        ngrok config add-authtoken "$env:NGROK_AUTH_TOKEN"
+        echo "Generando archivo de configuracion estricto ngrok.yml..."
+        # Creamos el directorio por defecto si no existe
+        New-Item -ItemType Directory -Force -Path "$env:LocalAppData\ngrok" | Out-Null
         
-        echo "=== INICIANDO TÚNELES PARA MOONLIGHT ==="
-        # CORRECCIÓN: Se expone el puerto 47990 mediante protocolo HTTPS para emparejar Sunshine de forma segura
-        Start-Process ngrok -ArgumentList "http https://localhost:47990"
+        # Escribimos el archivo de configuración forzando la creación de los Endpoints
+        $configContent = @"
+        version: "3"
+        agent:
+          authtoken: "$env:NGROK_AUTH_TOKEN"
+        endpoints:
+          - name: sunshine-web
+            proto: http
+            upstream:
+              url: https://localhost:47990
+          - name: moonlight-stream
+            proto: tcp
+            upstream:
+              url: tcp://localhost:47989
+        "@
+        Set-Content -Path "$env:LocalAppData\ngrok\ngrok.yml" -Value $configContent
         
-        # Bucle de espera de 6 horas
+        echo "=== INICIANDO TÚNELES INTEGRADOS ==="
+        # Arranca ngrok leyendo explícitamente el archivo generado
+        Start-Process ngrok -ArgumentList "start --all --config=$env:LocalAppData\ngrok\ngrok.yml"
+        
+        # Bucle de mantenimiento de 6 horas
         $timeout = 360 * 60
         $elapsed = 0
         while ($elapsed -lt $timeout) {
@@ -53,3 +70,4 @@ jobs:
             $elapsed += 60
             echo "Máquina virtual en línea... Tiempo corriendo: ($elapsed / $timeout) segundos"
         }
+
