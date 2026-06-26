@@ -1,0 +1,50 @@
+name: PC Gamer Virtual Moonlight
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  deploy_vm:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Configurar e Instalar Servidor Sunshine
+      run: |
+        echo "Descargando e instalando Sunshine para Moonlight..."
+        # Descarga e instala Sunshine silenciosamente
+        Invoke-WebRequest -Uri "https://github.com" -OutFile "sunshine_installer.exe"
+        Start-Process -FilePath ".\sunshine_installer.exe" -ArgumentList "/S" -Wait
+        
+    - name: Instalar Monitor Virtual (IddSampleDriver)
+      run: |
+        echo "Configurando Driver de Pantalla Virtual para evitar errores de resolución..."
+        # Esto simula un monitor físico indispensable para que Moonlight reciba señal de video
+        Invoke-WebRequest -Uri "https://github.com" -OutFile "driver.zip"
+        Expand-Archive -Path "driver.zip" -DestinationPath "C:\VirtualDisplay"
+        # Nota: En entornos públicos de GitHub Actions, Windows Server usará aceleración de pantalla básica por software/NVIDIA virtual local.
+
+    - name: Configurar Conexión Segura con Ngrok
+      env:
+        NGROK_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+      run: |
+        echo "Instalando Ngrok para la cuenta de mikegmiller26-gif..."
+        # Descarga oficial de Ngrok mediante Chocolatey
+        choco install ngrok -y
+        
+        # Autenticar con el token guardado en tus secretos
+        ngrok config add-authtoken "$env:NGROK_TOKEN"
+        
+        echo "=== INICIANDO TÚNELES PARA MOONLIGHT ==="
+        echo "Abriendo puertos necesarios (Sunshine utiliza los puertos Web UI 47990 y Streaming 47984-48010)"
+        
+        # Iniciar túnel TCP para el puerto de emparejamiento y control principal de Sunshine (47989 / 47990)
+        Start-Process ngrok -ArgumentList "tcp 47989"
+        
+        # Mantener viva la máquina virtual por un máximo de 6 horas para jugar
+        $timeout = 360 * 60
+        $elapsed = 0
+        while ($elapsed -lt $timeout) {
+            Start-Sleep -Seconds 60
+            $elapsed += 60
+            echo "Máquina virtual activa... Tiempo transcurrido: ($elapsed / $timeout) segundos"
+        }
