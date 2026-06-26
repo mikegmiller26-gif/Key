@@ -1,3 +1,4 @@
+
 name: PC Gamer Virtual Moonlight
 
 on: 
@@ -32,19 +33,19 @@ jobs:
 
     - name: Configurar Conexión Segura con Ngrok
       env:
-        # AQUÍ ESTÁ TU TOKEN INTEGRADO DIRECTAMENTE
         NGROK_AUTH_TOKEN: "2ZunC6v3YgGf687Xm9wLQ_2kR1p7v5B4N3M2kL9jH8g"
       run: |
         echo "Instalando Ngrok..."
         choco install ngrok -y
         
-        # Autenticar usando el token definido en el entorno
+        # Autenticar usando tu token integrado
         ngrok config add-authtoken "$env:NGROK_AUTH_TOKEN"
         
         echo "=== INICIANDO TÚNELES PARA MOONLIGHT ==="
-        Start-Process ngrok -ArgumentList "tcp 47989"
+        # CORRECCIÓN: Se expone el puerto 47990 mediante protocolo HTTPS para emparejar Sunshine de forma segura
+        Start-Process ngrok -ArgumentList "http https://localhost:47990"
         
-        # Bucle de espera de 6 horas para mantener tu juego activo
+        # Bucle de espera de 6 horas
         $timeout = 360 * 60
         $elapsed = 0
         while ($elapsed -lt $timeout) {
